@@ -1,0 +1,105 @@
+import re
+import pyzipper
+
+# Password strength checker
+def password_strength(password: str) -> dict:
+    criteria = {
+        "length": len(password) >= 8,
+        "uppercase": bool(re.search(r"[A-Z]", password)),
+        "lowercase": bool(re.search(r"[a-z]", password)),
+        "digit": bool(re.search(r"\d", password)),
+        "special": bool(re.search(r"[!@#$%^&*(),.?\":{}|<>]", password))
+    }
+
+    score = sum(criteria.values())
+    levels = {
+        0: "Very Weak",
+        1: "Weak",
+        2: "Moderate",
+        3: "Strong",
+        4: "Very Strong",
+        5: "Excellent"
+    }
+
+    feedback = []
+    if not criteria["length"]:
+        feedback.append("Use at least 8 characters.")
+    if not criteria["uppercase"]:
+        feedback.append("Add uppercase letters.")
+    if not criteria["lowercase"]:
+        feedback.append("Add lowercase letters.")
+    if not criteria["digit"]:
+        feedback.append("Include numbers.")
+    if not criteria["special"]:
+        feedback.append("Include special characters (!@#$ etc.).")
+
+    return {
+        "score": score,
+        "strength": levels[score],
+        "feedback": feedback if feedback else ["Great password!"]
+    }
+
+
+# Secure ZIP creation
+def create_secure_zip(file_path, zip_path, password):
+    result = password_strength(password)
+    if result["score"] < 3:  # Require at least "Strong"
+        print("❌ Password too weak!")
+        print("Strength:", result["strength"])
+        print("Suggestions:")
+        for tip in result["feedback"]:
+            print("-", tip)
+        return
+
+    with pyzipper.AESZipFile(zip_path,
+                             'w',
+                             compression=pyzipper.ZIP_DEFLATED,
+                             encryption=pyzipper.WZ_AES) as zf:
+        zf.setpassword(password.encode('utf-8'))
+        zf.write(file_path, arcname=file_path.split("/")[-1])
+    print(f"✅ Secure ZIP created: {zip_path}")
+
+
+# Secure ZIP extraction
+def extract_secure_zip(zip_path, extract_to, password):
+    try:
+        with pyzipper.AESZipFile(zip_path) as zf:
+            zf.setpassword(password.encode('utf-8'))
+            zf.extractall(path=extract_to)
+        print(f"✅ Files extracted to: {extract_to}")
+    except RuntimeError:
+        print("❌ Incorrect password! Extraction failed.")
+
+
+# Menu-driven interface
+def main():
+    while True:
+        print("\n--- Secure File Tool ---")
+        print("1. Encrypt file into secure ZIP")
+        print("2. Decrypt secure ZIP")
+        print("3. Exit")
+
+        choice = input("Choose an option (1-3): ")
+
+        if choice == "1":
+            file = input("Enter file path to encrypt: ")
+            zip_file = input("Enter name for secure ZIP (e.g., archive.zip): ")
+            pwd = input("Enter a password: ")
+            create_secure_zip(file, zip_file, pwd)
+
+        elif choice == "2":
+            zip_file = input("Enter secure ZIP file path: ")
+            extract_to = input("Enter folder to extract files: ")
+            pwd = input("Enter the password: ")
+            extract_secure_zip(zip_file, extract_to, pwd)
+
+        elif choice == "3":
+            print("Exiting... Stay secure!")
+            break
+
+        else:
+            print("Invalid choice. Please try again.")
+
+
+if __name__ == "__main__":
+    main()
